@@ -233,8 +233,8 @@ def run_experiment(train_dir, test_dir, batch_size, epochs, bert_model_name):
     print("Test Accuracy: %s" %s (accuracy))
 
 
-datapath_train = "C:\\Lincoln\\data\\aclImdb\\train"
-datapath_test = "C:\\Lincoln\\data\\aclImdb\\test"
+datapath_train = "/work/dataset/aclImdb/train"
+datapath_test = "/work/dataset/aclImdb/test"
 batch_size = 32
 epochs = 10
 bert_model_name = 'small_bert/bert_en_uncased_L-4_H-512_A-8' 

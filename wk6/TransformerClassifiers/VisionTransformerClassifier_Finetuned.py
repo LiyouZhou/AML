@@ -80,8 +80,8 @@ def run_experiment(train_dir, test_dir, BATCH_SIZE, EPOCHS):
     print("Test Accuracy: %s" % (round(accuracy * 100, 2)))
 
 
-datapath_train = "C:\\Lincoln\\data\\flower_photos-resised_train"
-datapath_test = "C:\\Lincoln\\data\\flower_photos-resised_test"
+datapath_train = "/work/dataset/flower_photos-resised_train"
+datapath_test = "/work/dataset/flower_photos-resised_test"
 EPOCHS = 10
 BATCH_SIZE = 32
 run_experiment(datapath_train, datapath_test, BATCH_SIZE, EPOCHS)

@@ -1,0 +1,7 @@
+gym==0.21.0
+swig
+box2d-py
+gymnasium
+pyglet==1.5.11
+stable-baselines3[extra]==1.8.0
+gym-super-mario-bros==7.3.0

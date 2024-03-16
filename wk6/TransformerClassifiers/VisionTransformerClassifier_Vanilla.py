@@ -1,13 +1,13 @@
 #####################################################
 # VisionTransformerClassifier_Vanilla.py
-# 
+#
 # Program extended and combined from the following two sources:
 # https://keras.io/examples/vision/image_classification_with_vision_transformer/
 # https://keras.io/examples/vision/vit_small_ds/
 #
 # This program classifies images of flowers using a Transformer trained from scratch,
 # which focuses on the vanilla Transformer (ViT) instead of ViT for small-size data.
-# Since this is a self-contained program, method "read_image_data" may be found in 
+# Since this is a self-contained program, method "read_image_data" may be found in
 # other similar programs and method "run_experiment" is also similar to others.
 #
 # Version: 1.0 -- more compact than original version, but see link above for details.
@@ -21,9 +21,9 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 from tensorflow import keras
 
-tf.get_logger().setLevel('ERROR')
+tf.get_logger().setLevel("ERROR")
 
-INPUT_SHAPE = (256,256,3)
+INPUT_SHAPE = (256, 256, 3)
 IMAGE_SIZE = 72
 PATCH_SIZE = 9
 NUM_PATCHES = (IMAGE_SIZE // PATCH_SIZE) ** 2
@@ -31,12 +31,16 @@ NUM_PATCHES = (IMAGE_SIZE // PATCH_SIZE) ** 2
 TRANSFORMER_LAYERS = 4
 NUM_HEADS = 8
 PROJECTION_DIM = 64
-TRANSFORMER_UNITS = [PROJECTION_DIM * 2, PROJECTION_DIM,]
+TRANSFORMER_UNITS = [
+    PROJECTION_DIM * 2,
+    PROJECTION_DIM,
+]
 MLP_HEAD_UNITS = [256, 128]
 LAYER_NORM_EPS = 1e-6
 
 LEARNING_RATE = 0.001
 WEIGHT_DECAY = 0.0001
+
 
 class Patches(keras.layers.Layer):
     def __init__(self, patch_size=PATCH_SIZE):
@@ -56,6 +60,7 @@ class Patches(keras.layers.Layer):
         patches = tf.reshape(patches, [batch_size, -1, patch_dims])
         return patches
 
+
 class PatchEncoder(keras.layers.Layer):
     def __init__(self, num_patches=NUM_PATCHES, projection_dim=PROJECTION_DIM):
         super(PatchEncoder, self).__init__()
@@ -70,39 +75,51 @@ class PatchEncoder(keras.layers.Layer):
         encoded = self.projection(patch) + self.position_embedding(positions)
         return encoded
 
+
 def read_image_data(data_path, verbose=False):
-    count=1
+    count = 1
     X = []
     Y = []
     data_dir = pathlib.Path(data_path)
-    print("Reading folder="+str(data_dir))
+    print("Reading folder=" + str(data_dir))
     dataset = tf.keras.utils.image_dataset_from_directory(data_dir)
     for image_batch, labels_batch in dataset:
         labels = labels_batch.numpy()
-        if (verbose): print("Batch labels -> "+str(labels))
+        if verbose:
+            print("Batch labels -> " + str(labels))
         for i in range(0, len(image_batch)):
             image = image_batch[i]
             label = labels[i]
             X.append(image)
             Y.append([label])
-            if (verbose): print("["+str(count)+"] image="+str(image.shape)+" label="+str(label))
+            if verbose:
+                print(
+                    "["
+                    + str(count)
+                    + "] image="
+                    + str(image.shape)
+                    + " label="
+                    + str(label)
+                )
             count += 1
-      
+
     X = np.array(X)
     Y = np.array(Y)
     class_names = dataset.class_names
-    
-    print("X="+str(X.shape))
-    print("Y="+str(Y.shape))
-    print("class_names="+str(class_names))
-    
+
+    print("X=" + str(X.shape))
+    print("Y=" + str(Y.shape))
+    print("class_names=" + str(class_names))
+
     return X, Y, class_names
+
 
 def mlp(x, hidden_units, dropout_rate):
     for units in hidden_units:
         x = keras.layers.Dense(units, activation=tf.nn.gelu)(x)
         x = keras.layers.Dropout(dropout_rate)(x)
     return x
+
 
 def create_classifier_model(NUM_CLASSES, data_augmentation):
     inputs = keras.layers.Input(shape=INPUT_SHAPE)
@@ -113,8 +130,8 @@ def create_classifier_model(NUM_CLASSES, data_augmentation):
     for _ in range(TRANSFORMER_LAYERS):
         x1 = keras.layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
         attention_output = keras.layers.MultiHeadAttention(
-                num_heads=NUM_HEADS, key_dim=PROJECTION_DIM, dropout=0.1
-            )(x1, x1)
+            num_heads=NUM_HEADS, key_dim=PROJECTION_DIM, dropout=0.1
+        )(x1, x1)
         x2 = keras.layers.Add()([attention_output, encoded_patches])
         x3 = keras.layers.LayerNormalization(epsilon=1e-6)(x2)
         x3 = mlp(x3, hidden_units=TRANSFORMER_UNITS, dropout_rate=0.1)
@@ -129,13 +146,16 @@ def create_classifier_model(NUM_CLASSES, data_augmentation):
     model.summary()
     return model
 
+
 def run_experiment(train_dir, test_dir, BATCH_SIZE, EPOCHS):
     x_train, y_train, class_names = read_image_data(train_dir)
     x_test, y_test, class_names = read_image_data(test_dir)
-    print("x_train shape: %s y_train shape: %s" %(x_train.shape, y_train.shape))
+    print("x_train shape: %s y_train shape: %s" % (x_train.shape, y_train.shape))
     print("x_test shape: %s y_test shape: %s" % (x_test.shape, y_test.shape))
 
-    optimizer = tfa.optimizers.AdamW(learning_rate=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    optimizer = tfa.optimizers.AdamW(
+        learning_rate=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+    )
     loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
     print("AUGMENTING DATA...")
@@ -148,7 +168,7 @@ def run_experiment(train_dir, test_dir, BATCH_SIZE, EPOCHS):
             keras.layers.RandomZoom(height_factor=0.2, width_factor=0.2),
         ],
         name="data_augmentation",
-        )
+    )
     data_augmentation.layers[0].adapt(x_train)
 
     print("CREATING classifier model...")
@@ -156,7 +176,9 @@ def run_experiment(train_dir, test_dir, BATCH_SIZE, EPOCHS):
 
     print("TRAINING & EVALUATING classifier model...")
     model.compile(optimizer=optimizer, loss=loss_fn, metrics=["accuracy"])
-    model.fit(x=x_train, y=y_train, batch_size=BATCH_SIZE, epochs=EPOCHS, validation_split=0.1)
+    model.fit(
+        x=x_train, y=y_train, batch_size=BATCH_SIZE, epochs=EPOCHS, validation_split=0.1
+    )
     _, accuracy = model.evaluate(x_test, y_test, batch_size=BATCH_SIZE)
     print("Test Accuracy: %s" % (round(accuracy * 100, 2)))
 

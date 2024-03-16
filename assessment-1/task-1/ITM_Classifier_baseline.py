@@ -78,6 +78,7 @@
 import sys
 import os
 import time
+
 # import einops
 import pickle
 import random
@@ -118,7 +119,7 @@ class ITM_DataLoader:
         print("done loading data...")
 
     # Sentence embeddings are dense vectors representing text data, one vector per sentence.
-    # Sentences with similar vectors would mean sentences with equivalent meanning.
+    # Sentences with similar vectors would mean sentences with equivalent meaning.
     # They are useful here to provide text-based features of questions in the data.
     # Note: sentence embeddings don't include label info, they are solely based on captions.
     def load_sentence_embeddings(self):
@@ -281,7 +282,13 @@ class ITM_Classifier(ITM_DataLoader):
         net = tf.keras.layers.Concatenate(axis=1)([vision_net, text_net])
         net = tf.keras.layers.Dropout(0.1)(net)
         net = tf.keras.layers.Dense(
-            self.num_classes, activation="softmax", name=self.classifier_model_name
+            128, activation="relu", name="classifier_dense_1"
+        )(net)
+        net = tf.keras.layers.Dense(
+            32, activation="relu", name="classifier_dense_2"
+        )(net)
+        net = tf.keras.layers.Dense(
+            self.num_classes, activation="softmax", name="classifier_dense_3"
         )(net)
         self.classifier_model = tf.keras.Model(
             inputs=[img_input, text_input], outputs=net
@@ -306,11 +313,16 @@ class ITM_Classifier(ITM_DataLoader):
         self.classifier_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
         # uncomment the next line if you wish to make use of early stopping during training
-        # callbacks = [tf.keras.callbacks.EarlyStopping(patience=11, restore_best_weights=True)]
+        callbacks = [
+            tf.keras.callbacks.EarlyStopping(patience=11, restore_best_weights=True)
+        ]
 
         self.history = self.classifier_model.fit(
-            x=self.train_ds, validation_data=self.val_ds, epochs=self.epochs
-        )  # , callbacks=callbacks)
+            x=self.train_ds,
+            validation_data=self.val_ds,
+            epochs=self.epochs,
+            callbacks=callbacks,
+        )
         print("model trained!")
 
     def test_classifier_model(self):
@@ -325,8 +337,8 @@ class ITM_Classifier(ITM_DataLoader):
             groundtruth = groundtruth.numpy()
             predictions = self.classifier_model(features)
             predictions = predictions.numpy()
-            captions = features["caption"].numpy()
-            file_names = features["file_name"].numpy()
+            # captions = features["caption"].numpy()
+            # file_names = features["file_name"].numpy()
 
             # read test data per batch
             for batch_index in range(0, len(groundtruth)):
@@ -341,13 +353,13 @@ class ITM_Classifier(ITM_DataLoader):
                 num_classifications += 1
 
                 # print a sample of predictions -- about 10% of all possible
-                if random.random() < 0.1:
-                    caption = captions[batch_index]
-                    file_name = file_names[batch_index].decode("utf-8")
-                    print(
-                        "ITM=%s PREDICTIONS: match=%s, no-match=%s \t -> \t %s"
-                        % (caption, probability_match, probability_nomatch, file_name)
-                    )
+                # if random.random() < 0.1:
+                #     caption = captions[batch_index]
+                #     file_name = file_names[batch_index].decode("utf-8")
+                #     print(
+                #         "ITM=%s PREDICTIONS: match=%s, no-match=%s \t -> \t %s"
+                #         % (caption, probability_match, probability_nomatch, file_name)
+                #     )
 
         # reveal test performance using our own calculations above
         accuracy = num_correct_predictions / num_classifications
@@ -358,7 +370,8 @@ class ITM_Classifier(ITM_DataLoader):
         print(f"Tensorflow test method: Loss: {loss}; ACCURACY: {accuracy}")
 
 
-# Let's create an instance of the main class
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+if __name__ == "__main__":
+    # Let's create an instance of the main class
+    print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
 
-itm = ITM_Classifier()
+    itm = ITM_Classifier()

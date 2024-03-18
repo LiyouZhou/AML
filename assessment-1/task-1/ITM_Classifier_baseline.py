@@ -231,9 +231,11 @@ class ITM_Classifier(ITM_DataLoader):
 
     # return learnt feature representations of input data (images)
     def create_vision_encoder(
-        self, num_projection_layers, projection_dims, dropout_rate
+        self, num_projection_layers, projection_dims, dropout_rate, img_input=None
     ):
-        img_input = layers.Input(shape=self.IMAGE_SHAPE, name="image_input")
+        if img_input is None:
+            img_input = layers.Input(shape=self.IMAGE_SHAPE, name="image_input")
+
         cnn_layer = layers.Conv2D(16, 3, padding="same", activation="relu")(img_input)
         cnn_layer = layers.MaxPooling2D()(cnn_layer)
         cnn_layer = layers.Conv2D(32, 3, padding="same", activation="relu")(cnn_layer)
@@ -273,20 +275,37 @@ class ITM_Classifier(ITM_DataLoader):
     # put together the feature representations above to create the image-text (multimodal) deep learning model
     def build_classifier_model(self):
         print(f"BUILDING model")
-        img_input, vision_net = self.create_vision_encoder(
-            num_projection_layers=1, projection_dims=128, dropout_rate=0.1
+
+        data_augmentation = keras.Sequential(
+            [
+                keras.layers.RandomFlip("horizontal"),
+                keras.layers.RandomRotation(factor=0.02),
+                keras.layers.RandomZoom(height_factor=0.2, width_factor=0.2),
+            ],
+            name="data_augmentation",
         )
+
+        img_input = layers.Input(shape=self.IMAGE_SHAPE, name="image_input")
+        augmented_input = data_augmentation(img_input)
+
+        _, vision_net = self.create_vision_encoder(
+            num_projection_layers=1,
+            projection_dims=128,
+            dropout_rate=0.1,
+            img_input=augmented_input,
+        )
+
         text_input, text_net = self.create_text_encoder(
             num_projection_layers=1, projection_dims=128, dropout_rate=0.1
         )
         net = tf.keras.layers.Concatenate(axis=1)([vision_net, text_net])
         net = tf.keras.layers.Dropout(0.1)(net)
-        net = tf.keras.layers.Dense(
-            128, activation="relu", name="classifier_dense_1"
-        )(net)
-        net = tf.keras.layers.Dense(
-            32, activation="relu", name="classifier_dense_2"
-        )(net)
+        net = tf.keras.layers.Dense(128, activation="relu", name="classifier_dense_1")(
+            net
+        )
+        net = tf.keras.layers.Dense(32, activation="relu", name="classifier_dense_2")(
+            net
+        )
         net = tf.keras.layers.Dense(
             self.num_classes, activation="softmax", name="classifier_dense_3"
         )(net)
@@ -313,8 +332,22 @@ class ITM_Classifier(ITM_DataLoader):
         self.classifier_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
         # uncomment the next line if you wish to make use of early stopping during training
+        log_dir = "logs/fit/" + self.classifier_model_name + "-" + str(int(time.time()))
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(
+            log_dir=log_dir, histogram_freq=1
+        )
+        checkpoint_filepath = f"{log_dir}/epoch_{{epoch}}_checkpoint.model.keras"
+        model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
+            filepath=checkpoint_filepath,
+            monitor="val_loss",
+            mode="max",
+            save_best_only=False,
+            save_freq="epoch",
+        )
         callbacks = [
-            tf.keras.callbacks.EarlyStopping(patience=11, restore_best_weights=True)
+            tf.keras.callbacks.EarlyStopping(patience=11, restore_best_weights=True),
+            tensorboard_callback,
+            model_checkpoint_callback,
         ]
 
         self.history = self.classifier_model.fit(

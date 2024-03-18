@@ -9,38 +9,6 @@ from vit_keras import vit
 
 from ITM_Classifier_baseline import ITM_Classifier
 
-
-class ITM_Classifier_ConvNeXt(ITM_Classifier):
-    def __init__(self):
-        super().__init__()
-
-    def create_vision_encoder(
-        self, num_projection_layers, projection_dims, dropout_rate
-    ):
-        """
-        return learnt feature representations of input data (images)
-        """
-        # Create the base model from the pre-trained model MobileNet V2
-        # preprocess_input = tf.keras.applications.ConvNeXtXLarge.preprocess_input
-        base_model = tf.keras.applications.ConvNeXtBase(
-            input_shape=self.IMAGE_SHAPE, include_top=False, weights="imagenet"
-        )
-        base_model.trainable = False
-        global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
-        img_input = layers.Input(shape=self.IMAGE_SHAPE, name="image_input")
-
-        # x = preprocess_input(img_input)
-        x = img_input
-        x = base_model(x, training=False)
-        x = layers.Dropout(dropout_rate)(x)
-        x = layers.Flatten()(x)
-        outputs = self.project_embeddings(
-            x, num_projection_layers, projection_dims, dropout_rate
-        )
-
-        return img_input, outputs
-
-
 INPUT_SHAPE = (224, 224, 3)
 IMAGE_SIZE = 72
 PATCH_SIZE = 9
@@ -141,45 +109,65 @@ class BiTModel(keras.Model):
         return self.head(bit_embedding)
 
 
-class ITM_Classifier_ViT(ITM_Classifier):
-    def __init__(self, BiT=False, ViT=False):
-        self.BiT = BiT
-        self.ViT = ViT
+class ITM_Classifier_Advanced(ITM_Classifier):
+    def __init__(self, base_model, trainable=False):
+        self.classifier_model_name = f"ITM_Classifier_Advanced_{base_model}"
+        self.base_model = base_model.lower()
+        self.trainable = trainable
         super().__init__()
 
     def create_vision_encoder(
-        self, num_projection_layers, projection_dims, dropout_rate
+        self, num_projection_layers, projection_dims, dropout_rate, img_input=None
     ):
         """
         return learnt feature representations of input data (images)
         """
-        img_input = layers.Input(shape=self.IMAGE_SHAPE, name="image_input")
+        if img_input is None:
+            img_input = layers.Input(shape=self.IMAGE_SHAPE, name="image_input")
 
-        if self.BiT:
-            module = hub.KerasLayer("https://www.kaggle.com/models/google/bit/frameworks/TensorFlow2/variations/m-r101x1/versions/1")
+        if self.base_model == "bit":
+            module = hub.KerasLayer(
+                "https://www.kaggle.com/models/google/bit/frameworks/TensorFlow2/variations/m-r101x1/versions/1"
+            )
+            module.trainable = False
             x = module(img_input)
 
-        elif self.ViT:
+        elif self.base_model == "vit":
             vit_model = vit.vit_b32(
-                image_size = INPUT_SHAPE[0],
-                activation = 'softmax',
-                pretrained = True,
-                include_top = False,
-                pretrained_top = False,
-                classes = 2
+                image_size=INPUT_SHAPE[0],
+                activation="softmax",
+                pretrained=True,
+                include_top=False,
+                pretrained_top=False,
+                classes=2,
             )
+            vit_model.trainable = self.trainable
             # resized_inputs = keras.layers.Resizing(IMAGE_SIZE, IMAGE_SIZE)(img_input)
-            x = vit_model(img_input, training=False)
+            x = vit_model(img_input, training=self.trainable)
+            x = layers.Dropout(dropout_rate)(x)
+            x = layers.Flatten()(x)
+
+        elif self.base_model == "convnext":
+            base_model = tf.keras.applications.ConvNeXtBase(
+                input_shape=self.IMAGE_SHAPE, include_top=False, weights="imagenet"
+            )
+            base_model.trainable = self.trainable
+
+            x = base_model(img_input, training=self.trainable)
+            x = layers.Dropout(dropout_rate)(x)
+            x = layers.Flatten()(x)
+
+        elif self.base_model == "vanilla_vit":
+            base_model = create_classifier_model()
+
+            x = base_model(img_input, training=True)
             x = layers.Dropout(dropout_rate)(x)
             x = layers.Flatten()(x)
 
         else:
-            base_model = create_classifier_model()
-
-            x = img_input
-            x = base_model(x, training=True)
-            x = layers.Dropout(dropout_rate)(x)
-            x = layers.Flatten()(x)
+            raise ValueError(
+                "base_model must be one of 'bit', 'vit', 'convnext', or 'vanilla_vit'"
+            )
 
         outputs = self.project_embeddings(
             x, num_projection_layers, projection_dims, dropout_rate
@@ -189,5 +177,24 @@ class ITM_Classifier_ViT(ITM_Classifier):
 
 
 if __name__ == "__main__":
-    # classifier = ITM_Classifier_ConvNeXt()
-    classifier = ITM_Classifier_ViT(ViT=True)
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--base_model",
+        type=str,
+        default="bit",
+        help="base model to use for the classifier",
+        choices=["bit", "vit", "convnext", "vanilla_vit"],
+    )
+    parser.add_argument(
+        "--trainable",
+        type=bool,
+        default=False,
+        help="whether to train the base model",
+    )
+    args = parser.parse_args()
+
+    classifier = ITM_Classifier_Advanced(
+        base_model=args.base_model, trainable=args.trainable
+    )

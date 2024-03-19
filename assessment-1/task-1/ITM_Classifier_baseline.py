@@ -75,7 +75,7 @@
 
 # Let's import the dependencies
 
-import sys
+import sys, re
 import os
 import time
 
@@ -88,6 +88,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from official.nlp import optimization
 import matplotlib.pyplot as plt
+from collections import Counter
 
 
 # Class for loading image and text data
@@ -110,13 +111,43 @@ class ITM_DataLoader:
     train_ds = None
     val_ds = None
     test_ds = None
+    VOCAB_SIZE = 20000
+    MAXLEN = 50
 
     def __init__(self):
         self.sentence_embeddings = self.load_sentence_embeddings()
+        self.words, self.indexes = self.get_dictionary(
+            self.train_data_file, self.VOCAB_SIZE
+        )
         self.train_ds = self.load_classifier_data(self.train_data_file)
         self.val_ds = self.load_classifier_data(self.dev_data_file)
         self.test_ds = self.load_classifier_data(self.test_data_file)
         print("done loading data...")
+
+    def get_dictionary(self, file_path, vocab_size):
+        print("EXTRACTING dictionary from " + str(file_path))
+        # step 1: generate a dictionary of words with their frequencies
+        word_freqs = Counter()
+        with open(file_path, "r") as f:
+            for line in f:
+                line = line.split("	")[1]
+                line = re.sub(r"[^\w\s]", "", line)  # remove punctuation
+                for word in line.split():
+                    word_freqs[word] += 1
+
+        # step 2: generate a set of word-index (and index-word) pairs -- the most popular words
+        words = {}
+        indexes = {}
+        num_words = 1
+        sorted_word_freqs = sorted(word_freqs.items(), key=lambda x: x[1], reverse=True)
+        for word, count in sorted_word_freqs:
+            words[word] = num_words
+            indexes[num_words] = word
+            num_words += 1
+            if num_words > vocab_size:
+                break
+        print("|words|=%s |indexes|=%s" % (len(words), len(indexes)))
+        return words, indexes
 
     # Sentence embeddings are dense vectors representing text data, one vector per sentence.
     # Sentences with similar vectors would mean sentences with equivalent meaning.
@@ -170,19 +201,29 @@ class ITM_DataLoader:
                 line = line.rstrip("\n")
                 img_name, text, raw_label = line.split("	")
                 img_name = os.path.join(self.IMAGES_PATH, img_name.strip())
+                image_data.append(img_name)
 
                 # get binary labels from match/no-match answers
                 label = [1, 0] if raw_label == "match" else [0, 1]
+                label_data.append(label)
                 # print("I=%s T=%s _L=%s L=%s" % (img_name, text, raw_label, label))
 
                 # get sentence embeddings (of textual captions)
                 text_sentence_embedding = self.sentence_embeddings[text]
                 text_sentence_embedding = tf.constant(text_sentence_embedding)
-
-                image_data.append(img_name)
                 embeddings_data.append(text_sentence_embedding)
-                text_data.append(text)
-                label_data.append(label)
+
+                sentence_vector = []
+                text = re.sub(r"[^\w\s]", "", text)  # remove punctuation
+                words_in_text = text.split()
+                for i in range(self.MAXLEN):
+                    if i < len(words_in_text):
+                        word = words_in_text[i]
+                        index = self.words[word] if word in self.words else 0
+                        sentence_vector.append(int(index))
+                    else:
+                        sentence_vector.append(0)  # zero-padding
+                text_data.append(sentence_vector)
 
         print("|image_data|=" + str(len(image_data)))
         print("|text_data|=" + str(len(text_data)))
@@ -331,7 +372,6 @@ class ITM_Classifier(ITM_DataLoader):
 
         self.classifier_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
-        # uncomment the next line if you wish to make use of early stopping during training
         log_dir = "logs/fit/" + self.classifier_model_name + "-" + str(int(time.time()))
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
             log_dir=log_dir, histogram_freq=1

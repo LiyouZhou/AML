@@ -8,6 +8,10 @@ import os
 from vit_keras import vit
 
 from ITM_Classifier_baseline import ITM_Classifier
+from TextTransformerClassifier_Vanilla import (
+    TransformerBlock,
+    TokenAndPositionEmbedding,
+)
 
 INPUT_SHAPE = (224, 224, 3)
 IMAGE_SIZE = 72
@@ -110,10 +114,13 @@ class BiTModel(keras.Model):
 
 
 class ITM_Classifier_Advanced(ITM_Classifier):
-    def __init__(self, base_model, trainable=False):
-        self.classifier_model_name = f"ITM_Classifier_Advanced_{base_model}"
-        self.base_model = base_model.lower()
+    def __init__(self, image_encoder, trainable=False, epochs=10, text_encoder="direct_embedding"):
+        self.image_encoder = image_encoder.lower()
+        self.text_encoder = text_encoder.lower()
         self.trainable = trainable
+        self.epochs = epochs
+        self.classifier_model_name = f"ITM_Classifier_Advanced_{image_encoder}_{text_encoder}_trainable_{trainable}_epochs_{epochs}"
+        self.epochs = epochs
         super().__init__()
 
     def create_vision_encoder(
@@ -125,14 +132,14 @@ class ITM_Classifier_Advanced(ITM_Classifier):
         if img_input is None:
             img_input = layers.Input(shape=self.IMAGE_SHAPE, name="image_input")
 
-        if self.base_model == "bit":
+        if self.image_encoder == "bit":
             module = hub.KerasLayer(
                 "https://www.kaggle.com/models/google/bit/frameworks/TensorFlow2/variations/m-r101x1/versions/1"
             )
             module.trainable = False
             x = module(img_input)
 
-        elif self.base_model == "vit":
+        elif self.image_encoder == "vit":
             vit_model = vit.vit_b32(
                 image_size=INPUT_SHAPE[0],
                 activation="softmax",
@@ -147,26 +154,31 @@ class ITM_Classifier_Advanced(ITM_Classifier):
             x = layers.Dropout(dropout_rate)(x)
             x = layers.Flatten()(x)
 
-        elif self.base_model == "convnext":
-            base_model = tf.keras.applications.ConvNeXtBase(
+        elif self.image_encoder == "convnext":
+            image_encoder = tf.keras.applications.ConvNeXtBase(
                 input_shape=self.IMAGE_SHAPE, include_top=False, weights="imagenet"
             )
-            base_model.trainable = self.trainable
+            image_encoder.trainable = self.trainable
 
-            x = base_model(img_input, training=self.trainable)
+            x = image_encoder(img_input, training=self.trainable)
             x = layers.Dropout(dropout_rate)(x)
             x = layers.Flatten()(x)
 
-        elif self.base_model == "vanilla_vit":
-            base_model = create_classifier_model()
+        elif self.image_encoder == "vanilla_vit":
+            image_encoder = create_classifier_model()
 
-            x = base_model(img_input, training=True)
+            x = image_encoder(img_input, training=True)
             x = layers.Dropout(dropout_rate)(x)
             x = layers.Flatten()(x)
+
+        elif self.image_encoder == "baseline":
+            return super().create_vision_encoder(
+                num_projection_layers, projection_dims, dropout_rate, img_input
+            )
 
         else:
             raise ValueError(
-                "base_model must be one of 'bit', 'vit', 'convnext', or 'vanilla_vit'"
+                "image_encoder must be one of 'bit', 'vit', 'convnext', 'vanilla_vit' or 'baseline'"
             )
 
         outputs = self.project_embeddings(
@@ -175,26 +187,66 @@ class ITM_Classifier_Advanced(ITM_Classifier):
 
         return img_input, outputs
 
+    def create_text_encoder(self, num_projection_layers, projection_dims, dropout_rate):
+        if self.text_encoder == "direct_embedding":
+            return super().create_text_encoder(
+                num_projection_layers, projection_dims, dropout_rate
+            )
+        elif self.text_encoder == "vanilla_transformer":
+            embed_dim = 64  # Embedding size for each token
+            num_heads = 2  # Number of attention heads
+            ff_dim = 32  # Hidden layer size in feed forward network inside transformer
+            vocab_size = 20000
+            maxlen = 50
+
+            print("CREATING classifier model...")
+            text_input = layers.Input(shape=(maxlen,), name="caption")
+            embedding_layer = TokenAndPositionEmbedding(maxlen, vocab_size, embed_dim)
+            x = embedding_layer(text_input)
+            transformer_block = TransformerBlock(embed_dim, num_heads, ff_dim)
+            x = transformer_block(x)
+            x = layers.GlobalAveragePooling1D()(x)
+
+            outputs = self.project_embeddings(
+                x, num_projection_layers, projection_dims, dropout_rate
+            )
+
+            print("outputs shape: ", outputs.shape)
+            return text_input, outputs
+
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--base_model",
+        "--image_encoder",
         type=str,
         default="bit",
-        help="base model to use for the classifier",
-        choices=["bit", "vit", "convnext", "vanilla_vit"],
+        help="base model to use for the image encoder",
+        choices=["bit", "vit", "convnext", "vanilla_vit", "baseline"],
+    )
+    parser.add_argument(
+        "--text_encoder",
+        type=str,
+        default="direct_embedding",
+        help="base model to use for the text encoder",
+        choices=["vanilla_transformer", "direct_embedding"],
     )
     parser.add_argument(
         "--trainable",
-        type=bool,
-        default=False,
+        action="store_true",
         help="whether to train the base model",
     )
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="number of epochs to train for"
+    )
+
     args = parser.parse_args()
 
     classifier = ITM_Classifier_Advanced(
-        base_model=args.base_model, trainable=args.trainable
+        image_encoder=args.image_encoder,
+        trainable=args.trainable,
+        epochs=args.epochs,
+        text_encoder=args.text_encoder,
     )

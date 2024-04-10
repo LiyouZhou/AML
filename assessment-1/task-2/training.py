@@ -29,66 +29,50 @@ from torch import nn
 from stable_baselines3.common.vec_env import VecFrameStack, DummyVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-
-
-# from https://www.kaggle.com/code/deeplyai/super-mario-bros-with-stable-baseline3-ppo
-class ResizeEnv(gym.ObservationWrapper):
-    def __init__(self, env, size):
-        gym.ObservationWrapper.__init__(self, env)
-        (oldh, oldw, oldc) = env.observation_space.shape
-        newshape = (size, size, oldc)
-        self.observation_space = gym.spaces.Box(
-            low=0, high=255, shape=newshape, dtype=np.uint8
-        )
-
-    def observation(self, frame):
-        height, width, _ = self.observation_space.shape
-        frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
-        if frame.ndim == 2:
-            frame = frame[:, :, None]
-        return frame
+from stable_baselines3.common.env_util import make_vec_env
 
 
 # from https://www.kaggle.com/code/deeplyai/super-mario-bros-with-stable-baseline3-ppo
 class CustomRewardAndDoneEnv(gym.Wrapper):
     def __init__(self, env=None):
         super(CustomRewardAndDoneEnv, self).__init__(env)
+        self.clear()
+
+    def clear(self):
         self.current_score = 0
         self.current_x = 0
         self.current_x_count = 0
         self.max_x = 0
 
     def reset(self, **kwargs):
-        self.current_score = 0
-        self.current_x = 0
-        self.current_x_count = 0
-        self.max_x = 0
+        self.clear()
         return self.env.reset(**kwargs)
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)
-        reward += max(0, info["x_pos"] - self.max_x)
+        # reward += max(0, info["x_pos"] - self.max_x)
         if (info["x_pos"] - self.current_x) == 0:
             self.current_x_count += 1
         else:
             self.current_x_count = 0
-        if info["flag_get"]:
-            reward += 500
-            done = True
-            print("GOAL")
-        if info["life"] < 2:
-            reward -= 500
-            done = True
+        # if info["flag_get"]:
+        #     reward += 500
+        #     done = True
+        #     print("GOAL")
+        # if info["life"] < 2:
+        #     reward -= 500
+        #     done = True
+
         self.current_score = info["score"]
         self.max_x = max(self.max_x, self.current_x)
         self.current_x = info["x_pos"]
 
         if self.current_x_count > 100:
-            reward -= 500
+            # reward -= 500
             done = True
             # print("STUCK")
 
-        return state, reward / 10.0, done, info
+        return state, reward, done, info
 
 
 class MarioNet(BaseFeaturesExtractor):
@@ -119,10 +103,10 @@ class MarioNet(BaseFeaturesExtractor):
         return self.linear(self.cnn(observations))
 
 
-policy_kwargs = dict(
-    features_extractor_class=MarioNet,
-    features_extractor_kwargs=dict(features_dim=512),
-)
+# policy_kwargs = dict(
+#     features_extractor_class=MarioNet,
+#     features_extractor_kwargs=dict(features_dim=512),
+# )
 
 
 class TrainAndLoggingCallback(BaseCallback):
@@ -193,21 +177,30 @@ class TrainAndLoggingCallback(BaseCallback):
 
 
 # create the learning environment
-def make_env(gym_id, seed, log_dir=None):
+def make_single_env(gym_id, seed, i, log_dir=None):
     env = gym_super_mario_bros.make(gym_id)
-    env = JoypadSpace(env, SIMPLE_MOVEMENT)
+    RIGHT_JUMP_ONLY = [
+        ['right'],
+        ['right', 'A'],
+    ]
+    env = JoypadSpace(env, RIGHT_JUMP_ONLY)
     env = CustomRewardAndDoneEnv(env)
     env = atari_wrappers.MaxAndSkipEnv(env, 4)
     env = atari_wrappers.NoopResetEnv(env, noop_max=30)
     env = atari_wrappers.ClipRewardEnv(env)
     env = Monitor(env, filename=log_dir)
-    env = GrayScaleObservation(env, keep_dim=True)
-    env = ResizeEnv(env, size=84)
-    env = DummyVecEnv([lambda: env])
-    env = VecFrameStack(env, 4, channels_order="last")
-    env.seed(seed)
-    env.action_space.seed(seed)
-    env.observation_space.seed(seed)
+    env = atari_wrappers.WarpFrame(env)
+    env.seed(seed + i)
+    env.action_space.seed(seed + i)
+    env.observation_space.seed(seed + i)
+
+    return env
+
+def make_env(gym_id, seed, log_dir=None):
+    env = make_single_env(gym_id, seed, 0, log_dir)
+    # env = DummyVecEnv([lambda: make_single_env(gym_id, seed, i, log_dir) for i in range(1)])
+    # env = VecFrameStack(env, 4, channels_order="last")
+
     return env
 
 
@@ -258,7 +251,7 @@ def build_model(
             learning_rate=learning_rate,
             gamma=gamma,
             verbose=1,
-            policy_kwargs=policy_kwargs,
+            # policy_kwargs=policy_kwargs,
             tensorboard_log=log_dir,
             n_steps=N_STEPS,
             batch_size=BATCH_SIZE,

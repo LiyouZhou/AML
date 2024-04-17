@@ -308,3 +308,7 @@ wk6/dataset/
 *.tar.gz
 *.zip
 *.tgz
+
+**/__pycache__
+assessment-1/task-1/logs/
+assessment-1/task-2/logs/

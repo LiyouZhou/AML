@@ -268,13 +268,16 @@ class ITM_Classifier(ITM_DataLoader):
     classifier_model = None
     history = None
     classifier_model_name = "ITM_Classifier-flickr"
-    simple_classifier = False
+    simple_classifier = True
     attention_classifier = False
 
-    def __init__(self):
+    def __init__(self, load_weights=None):
         super().__init__()
         self.build_classifier_model()
-        self.train_classifier_model()
+        if load_weights is not None:
+            self.classifier_model.load_weights(load_weights)
+        else:
+            self.train_classifier_model()
         self.test_classifier_model()
 
     # return learnt feature representations of input data (images)
@@ -402,8 +405,12 @@ class ITM_Classifier(ITM_DataLoader):
         num_train_steps = steps_per_epoch * self.epochs
         num_warmup_steps = int(0.2 * num_train_steps)
 
-        loss = tf.keras.losses.KLDivergence()
-        metrics = tf.keras.metrics.BinaryAccuracy()
+        loss = keras.losses.KLDivergence()
+        metrics = [
+            keras.metrics.BinaryAccuracy(),
+            keras.metrics.Precision(),
+            keras.metrics.Recall(),
+        ]
         optimizer = optimization.create_optimizer(
             init_lr=self.learning_rate,
             num_train_steps=num_train_steps,

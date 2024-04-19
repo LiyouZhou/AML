@@ -12,6 +12,7 @@ from TextTransformerClassifier_Vanilla import (
     TransformerBlock,
     TokenAndPositionEmbedding,
 )
+from TextTransformerClassifier_BERT import map_name_to_handle, map_model_to_preprocess
 
 INPUT_SHAPE = (224, 224, 3)
 IMAGE_SIZE = 72
@@ -114,7 +115,9 @@ class BiTModel(keras.Model):
 
 
 class ITM_Classifier_Advanced(ITM_Classifier):
-    def __init__(self, image_encoder, trainable=False, epochs=10, text_encoder="direct_embedding"):
+    def __init__(
+        self, image_encoder, trainable=False, epochs=10, text_encoder="direct_embedding"
+    ):
         self.image_encoder = image_encoder.lower()
         self.text_encoder = text_encoder.lower()
         self.trainable = trainable
@@ -136,7 +139,7 @@ class ITM_Classifier_Advanced(ITM_Classifier):
             module = hub.KerasLayer(
                 "https://www.kaggle.com/models/google/bit/frameworks/TensorFlow2/variations/m-r101x1/versions/1"
             )
-            module.trainable = False
+            module.trainable = self.trainable
             x = module(img_input)
 
         elif self.image_encoder == "vit":
@@ -199,8 +202,7 @@ class ITM_Classifier_Advanced(ITM_Classifier):
             vocab_size = 20000
             maxlen = 50
 
-            print("CREATING classifier model...")
-            text_input = layers.Input(shape=(maxlen,), name="caption")
+            text_input = layers.Input(shape=(maxlen,), name="sentence_vector")
             embedding_layer = TokenAndPositionEmbedding(maxlen, vocab_size, embed_dim)
             x = embedding_layer(text_input)
             transformer_block = TransformerBlock(embed_dim, num_heads, ff_dim)
@@ -212,6 +214,26 @@ class ITM_Classifier_Advanced(ITM_Classifier):
             )
 
             print("outputs shape: ", outputs.shape)
+            return text_input, outputs
+        elif self.text_encoder == "bert":
+            bert_model_name = "small_bert/bert_en_uncased_L-4_H-512_A-8"
+            tfhub_handle_encoder = map_name_to_handle[bert_model_name]
+            tfhub_handle_preprocess = map_model_to_preprocess[bert_model_name]
+
+            text_input = keras.layers.Input(shape=(), dtype=tf.string, name="caption")
+            encoder_inputs = hub.KerasLayer(
+                tfhub_handle_preprocess, name="preprocessing"
+            )(text_input)
+            encoder = hub.KerasLayer(
+                tfhub_handle_encoder, trainable=self.trainable, name="BERT_encoder"
+            )
+            outputs = encoder(encoder_inputs)
+            net = outputs["pooled_output"]  # take the pooled output of the BERT model
+            net = layers.Dropout(0.1)(net)
+            outputs = self.project_embeddings(
+                net, num_projection_layers, projection_dims, dropout_rate
+            )
+
             return text_input, outputs
 
 
@@ -231,7 +253,7 @@ if __name__ == "__main__":
         type=str,
         default="direct_embedding",
         help="base model to use for the text encoder",
-        choices=["vanilla_transformer", "direct_embedding"],
+        choices=["vanilla_transformer", "direct_embedding", "bert"],
     )
     parser.add_argument(
         "--trainable",

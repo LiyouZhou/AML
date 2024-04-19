@@ -89,7 +89,8 @@ from tensorflow.keras import layers
 from official.nlp import optimization
 import matplotlib.pyplot as plt
 from collections import Counter
-
+from TextTransformerClassifier_Vanilla import TransformerBlock
+import datetime
 
 # Class for loading image and text data
 
@@ -167,7 +168,7 @@ class ITM_DataLoader:
     # In contrast to text-data based on pre-trained features, image data does not use
     # any form of pre-training in this program. Instead, it makes use of raw pixels.
     # Notes that input features to the classifier are only pixels and sentence embeddings.
-    def process_input(self, img_path, dense_vector, text, label):
+    def process_input(self, img_path, dense_vector, text, label, sentence_vector):
         img = tf.io.read_file(img_path)
         img = tf.image.decode_jpeg(img, channels=3)
         img = tf.image.resize(img, self.IMAGE_SIZE)
@@ -178,6 +179,7 @@ class ITM_DataLoader:
         features["text_embedding"] = dense_vector
         features["caption"] = text
         features["file_name"] = img_path
+        features["sentence_vector"] = sentence_vector
         return features, label
 
     # This method loads the multimodal data, which comes from the following sources:
@@ -193,6 +195,7 @@ class ITM_DataLoader:
         text_data = []
         embeddings_data = []
         label_data = []
+        sentence_vectors = []
 
         # get image, text, label of image_files
         with open(data_files) as f:
@@ -223,7 +226,9 @@ class ITM_DataLoader:
                         sentence_vector.append(int(index))
                     else:
                         sentence_vector.append(0)  # zero-padding
-                text_data.append(sentence_vector)
+                sentence_vectors.append(sentence_vector)
+
+                text_data.append(text)
 
         print("|image_data|=" + str(len(image_data)))
         print("|text_data|=" + str(len(text_data)))
@@ -231,7 +236,7 @@ class ITM_DataLoader:
 
         # prepare a tensorflow dataset using the lists generated above
         dataset = tf.data.Dataset.from_tensor_slices(
-            (image_data, embeddings_data, text_data, label_data)
+            (image_data, embeddings_data, text_data, label_data, sentence_vectors)
         )
         dataset = dataset.shuffle(self.BATCH_SIZE * 8)
         dataset = dataset.map(self.process_input, num_parallel_calls=self.AUTOTUNE)
@@ -263,6 +268,8 @@ class ITM_Classifier(ITM_DataLoader):
     classifier_model = None
     history = None
     classifier_model_name = "ITM_Classifier-flickr"
+    simple_classifier = False
+    attention_classifier = False
 
     def __init__(self):
         super().__init__()
@@ -340,16 +347,50 @@ class ITM_Classifier(ITM_DataLoader):
             num_projection_layers=1, projection_dims=128, dropout_rate=0.1
         )
         net = tf.keras.layers.Concatenate(axis=1)([vision_net, text_net])
+
+        if self.attention_classifier:
+            ff_dim = 32
+            embed_dim = 256
+            rate = 0.1
+            inputs = tf.expand_dims(net, -1)
+            attn = layers.MultiHeadAttention(
+                key_dim=embed_dim, num_heads=2, output_shape=256
+            )
+
+            net = attn(inputs, inputs, return_attention_scores=False)
+
+            ffn = keras.Sequential(
+                [
+                    layers.Dense(ff_dim, activation="relu"),
+                    layers.Dense(embed_dim),
+                ]
+            )
+
+            attn_output = layers.Dropout(rate)(net)
+            out1 = layers.LayerNormalization(epsilon=1e-6)(inputs + attn_output)
+            ffn_output = ffn(out1)
+            ffn_output = layers.Dropout(rate)(ffn_output)
+            net = layers.LayerNormalization(epsilon=1e-6)(out1 + ffn_output)
+            # net = layers.GlobalAveragePooling1D(data_format="channels_first")(net)
+            net = layers.Flatten()(net)
+
         net = tf.keras.layers.Dropout(0.1)(net)
-        net = tf.keras.layers.Dense(128, activation="relu", name="classifier_dense_1")(
-            net
-        )
-        net = tf.keras.layers.Dense(32, activation="relu", name="classifier_dense_2")(
-            net
-        )
-        net = tf.keras.layers.Dense(
-            self.num_classes, activation="softmax", name="classifier_dense_3"
-        )(net)
+
+        if not self.simple_classifier:
+            net = tf.keras.layers.Dense(
+                128, activation="relu", name="classifier_dense_1"
+            )(net)
+            net = tf.keras.layers.Dense(
+                32, activation="relu", name="classifier_dense_2"
+            )(net)
+            net = tf.keras.layers.Dense(
+                self.num_classes, activation="softmax", name="classifier_dense_3"
+            )(net)
+        else:
+            net = tf.keras.layers.Dense(
+                self.num_classes, activation="softmax", name=self.classifier_model_name
+            )(net)
+
         self.classifier_model = tf.keras.Model(
             inputs=[img_input, text_input], outputs=net
         )
@@ -372,7 +413,9 @@ class ITM_Classifier(ITM_DataLoader):
 
         self.classifier_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
-        log_dir = "logs/fit/" + self.classifier_model_name + "-" + str(int(time.time()))
+        current_time = datetime.datetime.now()
+        timestamp = current_time.strftime("%Y-%m-%d_%H-%M-%S")
+        log_dir = "logs/fit/" + self.classifier_model_name + "-" + timestamp
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
             log_dir=log_dir, histogram_freq=1
         )

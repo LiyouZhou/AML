@@ -89,7 +89,7 @@ A number of image encoder has been added to the code for evaluation:
     \item Vanilla Vision Transformers - Vision Transformer with no pre-training
 \end{enumerate}
 
-A comparison of standard benchmark scores of the pre-trained encoders can be seen in Table \ref{tab:image-encoder-comparison}. All these encoders are trained on the Image text matching task for 10 epochs and the losses and accuracy are plotted against the baseline in Figure \ref{fig:image_encoder_loss_and_accuracy}. BiT Model was able to achieve the highest training accuracy of 88.6\% followed by ConvNeXt at 83.6\% and ViT at 82.3\%. The vanilla Vision Transformer and the baseline CNN model required training from scratch and were not able to achieve the same level of accuracy as the pre-trained models.
+A comparison of standard benchmark scores of the pre-trained encoders can be seen in Table \ref{tab:image_encoder_comparison}. All these encoders are trained on the Image text matching task for 10 epochs and the losses and accuracy are plotted against the baseline in Figure \ref{fig:image_encoder_loss_and_accuracy}. BiT Model was able to achieve the highest training accuracy of 88.6\% followed by ConvNeXt at 83.6\% and ViT at 82.3\%. The vanilla Vision Transformer and the baseline CNN model required training from scratch and were not able to achieve the same level of accuracy as the pre-trained models.
 
 \begin{table}
     \centering
@@ -105,7 +105,7 @@ A comparison of standard benchmark scores of the pre-trained encoders can be see
         ViT & b32 & ImageNet-21k & ~88 & 81.3 \\
         \bottomrule
     \end{tabular}
-    \label{tab:image-encoder-comparison}
+    \label{tab:image_encoder_comparison}
 \end{table}
 
 \begin{figure}
@@ -113,6 +113,17 @@ A comparison of standard benchmark scores of the pre-trained encoders can be see
     \includegraphics[width=0.49\textwidth]{image_encoder_loss_and_accuracy.png}
     \caption{Comparison of training and validation accuracy of the model with different image encoders. Trained for 10 epochs, fine tuning disabled. The dashed lines are valuation scores while the solid lines are training scores.}
     \label{fig:image_encoder_loss_and_accuracy}
+\end{figure}
+
+\subsection{Fine Tuning}
+
+The pre-trained models can be fine-tuned on the images in the text matching task by setting the weights trainable. Fig~\ref{fig:trainable_comparison} shows a slight improvement in performance through fine tuning.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{trainable_comparison.png}
+    \caption{Comparison of training and validation accuracy of the pre-trained model with and without fine tuning.}
+    \label{fig:trainable_comparison}
 \end{figure}
 
 \subsection{Data Augmentation}
@@ -141,7 +152,9 @@ Due to the constraint of the compute resources, only small version of BERT is us
 
 The baseline classifier connects directly from the embeddings to the output classification. This only allow linear relationships between the embeddings and the output. To model more complex non-linear relationships, the classifier is extended to include a few hidden layers.
 
-An attention layer is added to the classifier just after concatenating the text and image embeddings. This extracts information about each pair of elements in the embeddings and allows the model to learn better the relationship between the image and the text. Fig.~\ref{fig:classifier_comparison} shows the comparison of accuracy curve during training for the baseline direct classifier, adding hidden layers, and adding attention layer. The model with the attention layer achieved the highest accuracy of 94.3\% on the training set and 85.6\% on the validation set. It is notable that there is a large disparity between training and validation accuracy for the attention classifier. This suggests that the model is over-fitting to the training data.
+An attention layer is further added to the classifier just after concatenating the text and image embeddings. This extracts information about each pair of elements in the embeddings and allows the model to learn better the relationship between the image and the text.
+
+Fig.~\ref{fig:classifier_comparison} shows the comparison of accuracy curve during training for the baseline direct classifier, adding hidden layers, and adding attention layer. The model with the attention layer achieved the highest accuracy of 94.3\% on the training set and 85.6\% on the validation set. It is notable that there is a large disparity between training and validation accuracy for the attention classifier. This suggests that the model is over-fitting to the training data.
 
 \begin{figure}
     \centering
@@ -152,9 +165,37 @@ An attention layer is added to the classifier just after concatenating the text 
 
 \section{Image Text Matching Results}
 
-Taking the best performing modifications from the previous section, we train a model with BiT image encoding, direct text embedding from the task, and the classifier with attention layer. The model is trained until the validation accuracy stops improving. The training and validation accuracy curve is shown in Fig.~\ref{fig:final_model_accuracy}. The model achieved a training accuracy of 94.3\% and a validation accuracy of 85.6\%.
+Taking the best performing modifications from the previous section, a model is constructed with BiT image encoding, direct text embedding and classifier with attention layer. BiT weights is set to trainable so it is fine tuned on the task. The model has 51 million parameters and takes roughly 6 minute to train per epoch. The model is trained until the validation accuracy stops improving. The training and validation accuracy curve is shown in Fig.~\ref{fig:final_model_accuracy} and Table~\ref{tab:final_model_accuracy} shows the performance of the model compared to the baseline.
 
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{final_model_accuracy.png}
+    \caption{Training curve of the best performing model}
+    \label{fig:final_model_accuracy}
+\end{figure}
 
+\begin{table}
+    \centering
+    \caption{Performance of models}
+    \begin{tabular}{| c | c | c |}
+        \toprule
+        Models & Baseline & Best \\
+        \midrule
+        Epochs & 21 & 16 \\
+        \midrule
+        Final Loss & 0.6158 & 0.1550 \\
+        \midrule
+        Train Accuracy & 0.6795 & 0.9568 \\
+        \midrule
+        Validation Accuracy & 0.6598 & 0.8660 \\
+        \midrule
+        Test Accuracy & 0.6477 & 0.8337 \\
+        \midrule
+        Inference Speed (ms) & 6 & 102 \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:final_model_accuracy}
+\end{table}
 
 \section{Reinforcement Learning Methodology}
 

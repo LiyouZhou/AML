@@ -116,7 +116,12 @@ class BiTModel(keras.Model):
 
 class ITM_Classifier_Advanced(ITM_Classifier):
     def __init__(
-        self, image_encoder, trainable=False, epochs=10, text_encoder="direct_embedding"
+        self,
+        image_encoder,
+        trainable=False,
+        epochs=10,
+        text_encoder="direct_embedding",
+        load_weights=None,
     ):
         self.image_encoder = image_encoder.lower()
         self.text_encoder = text_encoder.lower()
@@ -124,7 +129,7 @@ class ITM_Classifier_Advanced(ITM_Classifier):
         self.epochs = epochs
         self.classifier_model_name = f"ITM_Classifier_Advanced_{image_encoder}_{text_encoder}_trainable_{trainable}_epochs_{epochs}"
         self.epochs = epochs
-        super().__init__()
+        super().__init__(load_weights)
 
     def create_vision_encoder(
         self, num_projection_layers, projection_dims, dropout_rate, img_input=None
@@ -263,6 +268,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs", type=int, default=10, help="number of epochs to train for"
     )
+    parser.add_argument(
+        "--load_weights",
+        type=str,
+        default=None,
+        help="directory to load the model weights",
+    )
 
     args = parser.parse_args()
 
@@ -271,4 +282,5 @@ if __name__ == "__main__":
         trainable=args.trainable,
         epochs=args.epochs,
         text_encoder=args.text_encoder,
+        load_weights=args.load_weights,
     )

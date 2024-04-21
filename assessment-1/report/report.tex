@@ -28,7 +28,7 @@
 \maketitle
 
 \begin{abstract}
-    Lorem ipsum dolor sit amet, consectetur adipiscing elit
+    Machine learning methods is revolutionizing the field of artificial intelligence. In this coursework, we will explore two different machine learning tasks: image text matching and deep reinforcement learning. We evaluate the performance of different image and text encoders and classifiers for the image text matching task. For deep reinforcement learning, we test 3 different algorithms on the Mario game environment. The best performing model for image text matching achieved an accuracy of 83.37\% on the test set. The best performing algorithm for deep reinforcement learning achieved an average reward of 1000 per episode after 5 million steps.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -96,13 +96,13 @@ A comparison of standard benchmark scores of the pre-trained encoders can be see
     \caption{Image Encoder Comparison}
     \begin{tabular}{| p{1.2cm} | c | c | p{1.2cm} | p{1.2cm} |}
         \toprule
-        Model & Variant & Pre-training & Parameters\linebreak (Million) & Accuracy\linebreak (\%) \tablefootnote{Top 1 accuracy on ImageNet} \\
+        Model    & Variant    & Pre-training & Parameters\linebreak (Million) & Accuracy\linebreak (\%) \tablefootnote{Top 1 accuracy on ImageNet} \\
         \midrule
-        BiT & ResNet-101 & ImageNet-21k & ~40 & 87.5 \\
+        BiT      & ResNet-101 & ImageNet-21k & ~40                            & 87.5                                                               \\
         \midrule
-        ConvNeXt & Base & ImageNet & ~89 & 85.3 \\
+        ConvNeXt & Base       & ImageNet     & ~89                            & 85.3                                                               \\
         \midrule
-        ViT & b32 & ImageNet-21k & ~88 & 81.3 \\
+        ViT      & b32        & ImageNet-21k & ~88                            & 81.3                                                               \\
         \bottomrule
     \end{tabular}
     \label{tab:image_encoder_comparison}
@@ -179,19 +179,19 @@ Taking the best performing modifications from the previous section, a model is c
     \caption{Performance of models}
     \begin{tabular}{| c | c | c |}
         \toprule
-        Models & Baseline & Best \\
+        Models               & Baseline & Best   \\
         \midrule
-        Epochs & 21 & 16 \\
+        Epochs               & 21       & 16     \\
         \midrule
-        Final Loss & 0.6158 & 0.1550 \\
+        Final Loss           & 0.6158   & 0.1550 \\
         \midrule
-        Train Accuracy & 0.6795 & 0.9568 \\
+        Train Accuracy       & 0.6795   & 0.9568 \\
         \midrule
-        Validation Accuracy & 0.6598 & 0.8660 \\
+        Validation Accuracy  & 0.6598   & 0.8660 \\
         \midrule
-        Test Accuracy & 0.6477 & 0.8337 \\
+        Test Accuracy        & 0.6477   & 0.8337 \\
         \midrule
-        Inference Speed (ms) & 6 & 102 \\
+        Inference Speed (ms) & 6        & 102    \\
         \bottomrule
     \end{tabular}
     \label{tab:final_model_accuracy}
@@ -211,38 +211,83 @@ Taking the best performing modifications from the previous section, a model is c
 
 \subsection{State-action space reduction}
 
-Mario game has a large sate-action space. For the learning algorithm to fully explore the space and learn a robust policy, the computational cost quickly becomes intractable. Hence a number of optimization is done to reduce the state-action space:
+Mario game has a large state-action space. For the learning algorithm to fully explore the space and learn a robust policy, the computational cost quickly becomes intractable. Hence a number of optimization is done to reduce the state-action space:
 
 \begin{itemize}
     \item Image down-sampling - The image input is down-sampled to reduce the number of pixels to 64x64.
     \item Grey scaling - The image is converted to grey scale to reduce the number of channels.
-    \item Reduce Action space: The action space is reduced to 4 actions: move right, jump, jump right, no op.
+    \item Reduce Action space: The action space is reduced to 6 actions: move right, jump, jump right, no op, power move right, power jump right. The game manual suggests that button B (power) allows mario to jump higher and quicker, and hence essential in getting over large obstacles.
     \item Skip frames: Action is only applied every 4 frames of the game. The action is repeated for the skipped frames.
 \end{itemize}
+
+An example frame can be seen in Fig~\ref{fig:temporal_context}.
 
 \subsection{Temporal Context}
 
 Sometime it is important for the agent to understand the temporal context of the game. For example, the optimal action for Mario when a Goomba is moving towards him is different from when Goomba is moving away. The view of the game is completely identical if only looking at the single frame at a time.
 
-To address this, 4 most recent frames are concatenated together to form the state input to the agent.
+To address this, 4 most recent frames are concatenated together to form the state input to the agent. Fig.~\ref{fig:temporal_context} shows an illustration of the temporal context of the game.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{temporal_context_mario.png}
+    \caption{Temporal context of the game - most recent 4 frames}
+    \label{fig:temporal_context}
+\end{figure}
 
 \subsection{Computer resource optimization}
 
 To speed up the training process, the following optimization is done:
 \begin{enumerate}
     \item Early termination - It is observed that the agent often gets stuck at a particular state and unable to advance to the right. Hence a custom wrapper is written for the environment so that the episode is terminated quickly in that situation.
-    \item Parallelization - Multiple instances of the environment are run in parallel. Each environment is initialized with a different random seed. Agent is deployed on each instance and the experience is collected in parallel. Then policy/value update is done in a batch on the collected experience. This allows efficient use of the multi-core CPU and GPU resources.
+    \item Parallelization - Multiple instances of the environment are run in parallel. Each environment is initialized with a different random seed. Agent is deployed on each instance and the experience is collected in parallel. Then policy/value update is done in a batch on the collected experience. This allows efficient use of the multi-core CPU and GPU resources. This improves the training speed from ~100it/s to ~500it/s.
 \end{enumerate}
 
 \subsection{Reward Shaping}
 
-In the environment the reward is clipped to [-15, 15], then in the baseline implementation of the task, it is further clipped to [-1, 1]. \cite{vanhasseltLearningValuesMany2016} suggest that the learning algorithms are not reward scale invariant. Clipping makes the reward signal sparse and the agent has to explore a lot to find the optimal policy. Hence appropriate scale of the reward is important.
+In the environment the reward is clipped to [-15, 15], then in the baseline implementation of the task, it is further clipped to [-1, 1]. \cite{vanhasseltLearningValuesMany2016} suggest that the learning algorithms are not reward scale invariant. Clipping makes the reward signal sparse and the agent has to explore a lot to find the optimal policy. Hence appropriate scale of the reward is important. The reward is intercepted and scaled to [-1, 1] before being passed to the agent.
 
 \section{Reinforcement Learning Results}
 
+\subsection{Compare Algorithms}
+
+The 3 algorithms are trained on the Mario game environment. The average reward per episode is plotted in Fig.~\ref{fig:compare_algorithms}. It can be seen that PPO outperforms the other 2 algorithms.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{compare_alg.png}
+    \caption{Average reward per episode for different reinforcement learning algorithms. Trains for 500000 steps. 3 runs are done per algorithm (faded color) and the average training curve is plotted (solid color). Reward plotted is a running average of 100 episodes.}
+    \label{fig:compare_algorithms}
+\end{figure}
+
+\subsection{Hyper-Parameter Tuning}
+
+Different gamma value and learning rates are tested. The average reward per episode is plotted Fig.~\ref{fig:compare_gamma} and Fig.~\ref{fig:compare_learning_rate}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{compare_gamma.png}
+    \caption{Average reward per episode for different gamma values. Learning rate is fixed at 0.0001 and algorithm used is PPO.}
+    \label{fig:compare_gamma}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\textwidth]{compare_learning_rate.png}
+    \caption{Average reward per episode for different learning rate values. Learning rate is fixed at 0.0001 and algorithm used is PPO.}
+    \label{fig:compare_learning_rate}
+\end{figure}
+
+The best performing hyper-parameters are selected for the final training:
+\(learning_rate = 0.0001, gamma=0.9\).
+
+\subsection{Large number of steps}
+
+Use the best performing hyper-parameters and PPO algorithm, the agent is trained for 5 million steps. The running average rewards per episode is plotted in Fig.~\ref{fig:final_training}.
+
 \section{Conclusion}
 
-
+In this coursework, we explored two different machine learning tasks: image text matching and deep reinforcement learning. For image text matching, we experimented with different image and text encoders and classifiers. The best performing model combined a pre-trained CNN image encoder with attention based classifier achieving an accuracy of 83.37\% on the test set. For deep reinforcement learning, we tested 3 different algorithms on the Mario game environment. The best performing algorithm is PPO, which achieved an average reward of 1000 per episode after 5 million steps.
 
 \bibliographystyle{IEEEtran}
 \bibliography{IEEEabrv,AML.bib}

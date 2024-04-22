@@ -13,6 +13,9 @@
 \usepackage[flushleft]{threeparttable}
 \usepackage{tablefootnote}
 \graphicspath{ {./figures/} }
+\usepackage{caption}
+\captionsetup{belowskip=-10pt}
+\captionsetup{aboveskip=0pt}
 
 \begin{document}
 
@@ -28,7 +31,7 @@
 \maketitle
 
 \begin{abstract}
-    Machine learning methods is revolutionizing the field of artificial intelligence. In this coursework, we will explore two different machine learning tasks: image text matching and deep reinforcement learning. We evaluate the performance of different image and text encoders and classifiers for the image text matching task. For deep reinforcement learning, we test 3 different algorithms on the Mario game environment. The best performing model for image text matching achieved an accuracy of 83.37\% on the test set. The best performing algorithm for deep reinforcement learning achieved an average reward of 1000 per episode after 5 million steps.
+    Machine learning methods is revolutionizing the field of artificial intelligence. In this coursework, we explore two machine learning tasks: image text matching (ITM) and deep reinforcement learning (DRL). We evaluate the performance of different image and text encoders and classifiers for the ITM task with the best performing model achieving an accuracy of 83.37\% on the test set. For DRL, 3 different algorithms are tested on the Mario game environment. The best performing algorithm is PPO, which achieved an average reward of 423 per episode after 5 million steps of training and is able to complete level 1 consistently.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -38,9 +41,7 @@
 
 \section{Introduction}
 
-Machine learning methods is revolutionizing the field of artificial intelligence. It has been applied to a wide range of tasks, from image recognition, natural language processing, to reinforcement learning.
-
-In this coursework, we will explore two different machine learning tasks: image text matching and deep reinforcement learning.
+Machine learning methods is revolutionizing the field of artificial intelligence. It has been applied to a wide range of tasks, from image recognition, natural language processing, to reinforcement learning. In this coursework, we will explore two different machine learning tasks: image text matching and deep reinforcement learning.
 
 For image text matching, image is encoded with convolution neural network or vision transformers. Text is encoded with a transformer. The embeddings are then combined to train a classifier to predict the relationship between the image and the text.
 
@@ -50,7 +51,7 @@ For deep reinforcement learning task, we will use the Mario game environment. Th
 
 \subsection{Convolutions neural networks}
 
-CNN has been the dominant architecture for image classification tasks. ResNet, proposed in \cite{heDeepResidualLearning2015} in 2015, achieved state-of-the-art performance on the ImageNet dataset. It introduced the concept of residual blocks, which allows the network to be trained deeper without the vanishing gradient problem. \textbf{Big Transfer} (BiT) - Based on ResNet\cite{heDeepResidualLearning2015}, is a training regime proposed in \cite{kolesnikovBigTransferBiT2020} that achieves improved performance on a number of image classification benchmarks via transfer learning. Proposed in \cite{liuConvNet2020s2022}, \textbf{ConvNeXt} is a pure convolutional network also based on ResNet but incorporates several design element of ViT.
+CNN has been the dominant architecture for image classification tasks. ResNet, proposed in \cite{heDeepResidualLearning2015} in 2015, achieved state-of-the-art performance on the ImageNet dataset. It introduced the concept of residual blocks, which allows the network to be trained deeper without the vanishing gradient problem. \textbf{Big Transfer} (BiT) - Based on ResNet\cite{heDeepResidualLearning2015}, is a training regime proposed in \cite{kolesnikovBigTransferBiT2020} that achieves improved performance on a number of image classification benchmarks via transfer learning. Proposed in \cite{liuConvNet2020s2022}, \textbf{ConvNeXt} is a pure convolutional network also based on ResNet but incorporates several design element of vision transformer.
 
 \subsection{Vision Transformers}
 
@@ -69,12 +70,12 @@ In solving learning task with complex and continuous state space, deep reinforce
 \begin{itemize}
     \item CNN as state space encoder from image inputs.
     \item Neural network as a Q value function.
-    \item Experience Relay buffer to store and sample experiences. This improves sample efficiency as each experience can be used in multiple weight updates.
+    \item Experience Replay buffer to store and learn from past experiences.
 \end{itemize}
 
 \textbf{Advantage Actor Critic} (A2C) - Outlined by \cite{plaatDeepReinforcementLearning2022} employs the use of a critic to estimate how much better a particular action is compared to the expectation of a state. The actor then uses this information to update the policy.
 
-\textbf{Proximal Policy Optimization} \cite{schulmanProximalPolicyOptimization2017} proposes a new class of policy based gradient methods for RL that alternative between sampling data from environment and optimizing the objective function. It further improves the sample efficiency by performing multiple epochs of optimization on the same batch of data.
+\textbf{Proximal Policy Optimization} \cite{schulmanProximalPolicyOptimization2017} proposes a new class of policy based gradient methods for RL that alternates between sampling data from environment and optimizing the objective function. It further improves the sample efficiency by performing multiple epochs of optimization on the same batch of data.
 
 \section{Image Text Matching Methodology}
 
@@ -89,28 +90,11 @@ A number of image encoder has been added to the code for evaluation:
     \item Vanilla Vision Transformers - Vision Transformer with no pre-training
 \end{enumerate}
 
-A comparison of standard benchmark scores of the pre-trained encoders can be seen in Table \ref{tab:image_encoder_comparison}. All these encoders are trained on the Image text matching task for 10 epochs and the losses and accuracy are plotted against the baseline in Figure \ref{fig:image_encoder_loss_and_accuracy}. BiT Model was able to achieve the highest training accuracy of 88.6\% followed by ConvNeXt at 83.6\% and ViT at 82.3\%. The vanilla Vision Transformer and the baseline CNN model required training from scratch and were not able to achieve the same level of accuracy as the pre-trained models.
-
-\begin{table}
-    \centering
-    \caption{Image Encoder Comparison}
-    \begin{tabular}{| p{1.2cm} | c | c | p{1.2cm} | p{1.2cm} |}
-        \toprule
-        Model    & Variant    & Pre-training & Parameters\linebreak (Million) & Accuracy\linebreak (\%) \tablefootnote{Top 1 accuracy on ImageNet} \\
-        \midrule
-        BiT      & ResNet-101 & ImageNet-21k & ~40                            & 87.5                                                               \\
-        \midrule
-        ConvNeXt & Base       & ImageNet     & ~89                            & 85.3                                                               \\
-        \midrule
-        ViT      & b32        & ImageNet-21k & ~88                            & 81.3                                                               \\
-        \bottomrule
-    \end{tabular}
-    \label{tab:image_encoder_comparison}
-\end{table}
+All these encoders are trained on the Image text matching task for 10 epochs and the losses and accuracy are plotted against the baseline in Figure \ref{fig:image_encoder_loss_and_accuracy}. BiT Model was able to achieve the highest training accuracy of 88.6\% followed by ConvNeXt at 83.6\% and ViT at 82.3\%. The vanilla Vision Transformer and the baseline CNN model required training from scratch and were not able to achieve the same level of accuracy as the pre-trained models.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{image_encoder_loss_and_accuracy.png}
+    \includegraphics[width=0.45\textwidth]{image_encoder_loss_and_accuracy.png}
     \caption{Comparison of training and validation accuracy of the model with different image encoders. Trained for 10 epochs, fine tuning disabled. The dashed lines are valuation scores while the solid lines are training scores.}
     \label{fig:image_encoder_loss_and_accuracy}
 \end{figure}
@@ -121,7 +105,7 @@ The pre-trained models can be fine-tuned on the images in the text matching task
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{trainable_comparison.png}
+    \includegraphics[width=0.45\textwidth]{trainable_comparison.png}
     \caption{Comparison of training and validation accuracy of the pre-trained model with and without fine tuning.}
     \label{fig:trainable_comparison}
 \end{figure}
@@ -143,33 +127,31 @@ Due to the constraint of the compute resources, only small version of BERT is us
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{text_encoder_comparison.png}
+    \includegraphics[width=0.45\textwidth]{text_encoder_comparison.png}
     \caption{Comparison of training and validation accuracy of the model with different text encoders}
     \label{fig:text_encoder_comparison}
 \end{figure}
 
 \subsection{Classifier}
 
-The baseline classifier connects directly from the embeddings to the output classification. This only allow linear relationships between the embeddings and the output. To model more complex non-linear relationships, the classifier is extended to include a few hidden layers.
+The baseline classifier connects directly from the embeddings to the output classification. This models only linear relationships between the embeddings and the output. To model more complex non-linear relationships, the classifier is augmented with a few hidden layers. An attention layer is further added after concatenating the text and image embeddings. This extracts information about each pair of elements in the embeddings and allows the model to learn better the relationship between the image and the text.
 
-An attention layer is further added to the classifier just after concatenating the text and image embeddings. This extracts information about each pair of elements in the embeddings and allows the model to learn better the relationship between the image and the text.
-
-Fig.~\ref{fig:classifier_comparison} shows the comparison of accuracy curve during training for the baseline direct classifier, adding hidden layers, and adding attention layer. The model with the attention layer achieved the highest accuracy of 94.3\% on the training set and 85.6\% on the validation set. It is notable that there is a large disparity between training and validation accuracy for the attention classifier. This suggests that the model is over-fitting to the training data.
+Fig.~\ref{fig:classifier_comparison} shows the comparison for the baseline classifier, adding hidden layers, and adding attention layer. The model with the attention layer achieved the highest accuracy of 94.3\% on the training set. It is notable that there is a large disparity between training and validation accuracy for the attention classifier. This suggests that the model is over-fitting to the training data.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{classifier_comparison.png}
+    \includegraphics[width=0.45\textwidth]{classifier_comparison.png}
     \caption{Comparison of training and validation accuracy of the model with different classifiers}
     \label{fig:classifier_comparison}
 \end{figure}
 
 \section{Image Text Matching Results}
 
-Taking the best performing modifications from the previous section, a model is constructed with BiT image encoding, direct text embedding and classifier with attention layer. BiT weights is set to trainable so it is fine tuned on the task. The model has 51 million parameters and takes roughly 6 minute to train per epoch. The model is trained until the validation accuracy stops improving. The training and validation accuracy curve is shown in Fig.~\ref{fig:final_model_accuracy} and Table~\ref{tab:final_model_accuracy} shows the performance of the model compared to the baseline.
+Taking the best performing modifications from the previous section, a model is constructed with BiT image encoding, direct text embedding and classifier with attention layer. BiT weights is set to trainable so it is fine tuned. The model has 51 million parameters and takes roughly 6 minute to train per epoch. The model is trained until the validation accuracy stops improving. The training and validation accuracy curve is shown in Fig.~\ref{fig:final_model_accuracy} and Table~\ref{tab:final_model_accuracy} compares the performance of the model to the baseline.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{final_model_accuracy.png}
+    \includegraphics[width=0.45\textwidth]{final_model_accuracy.png}
     \caption{Training curve of the best performing model}
     \label{fig:final_model_accuracy}
 \end{figure}
@@ -205,7 +187,7 @@ Taking the best performing modifications from the previous section, a model is c
 
 \begin{enumerate}
     \item Deep Q-Learning (DQN) - value based method
-    \item Advantage Actor Critic (A2C) - policy based actor critic architecture with experience replay.
+    \item Advantage Actor Critic (A2C) - policy based actor critic architecture
     \item Proximal Policy Optimization (PPO) - policy based actor critic architecture with more effective experience replay and weights update.
 \end{enumerate}
 
@@ -214,23 +196,23 @@ Taking the best performing modifications from the previous section, a model is c
 Mario game has a large state-action space. For the learning algorithm to fully explore the space and learn a robust policy, the computational cost quickly becomes intractable. Hence a number of optimization is done to reduce the state-action space:
 
 \begin{itemize}
-    \item Image down-sampling - The image input is down-sampled to reduce the number of pixels to 64x64.
-    \item Grey scaling - The image is converted to grey scale to reduce the number of channels.
-    \item Reduce Action space: The action space is reduced to 6 actions: move right, jump, jump right, no op, power move right, power jump right. The game manual suggests that button B (power) allows mario to jump higher and quicker, and hence essential in getting over large obstacles.
-    \item Skip frames: Action is only applied every 4 frames of the game. The action is repeated for the skipped frames.
+    \item \textbf{Image down-sampling} - The image input is down-sampled to reduce the number of pixels to 64x64.
+    \item \textbf{Grey scaling} - The image is converted to grey scale to reduce the number of channels.
+    \item \textbf{Reduce Action space} - The action space is reduced to 5 actions: no op, move right, jump right,  power move right, power jump right. The game manual suggests that button B (power) allows mario to jump higher and quicker, and hence essential in getting over large obstacles.
+    \item \textbf{Skip frames} - Action is only applied every 4 frames of the game. The action is repeated for the skipped frames and the rewards summed.
 \end{itemize}
 
-An example frame can be seen in Fig~\ref{fig:temporal_context}.
+An example state observation can be seen in Fig~\ref{fig:temporal_context}.
 
 \subsection{Temporal Context}
 
-Sometime it is important for the agent to understand the temporal context of the game. For example, the optimal action for Mario when a Goomba is moving towards him is different from when Goomba is moving away. The view of the game is completely identical if only looking at the single frame at a time.
+Sometime it is important for the agent to understand the temporal context of the game. For example, the optimal action for Mario when a Goomba is moving towards him is different from when Goomba is moving away. The view of the game is completely identical if only looking at a single frame at a time.
 
 To address this, 4 most recent frames are concatenated together to form the state input to the agent. Fig.~\ref{fig:temporal_context} shows an illustration of the temporal context of the game.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{temporal_context_mario.png}
+    \includegraphics[width=0.45\textwidth]{temporal_context_mario.png}
     \caption{Temporal context of the game - most recent 4 frames}
     \label{fig:temporal_context}
 \end{figure}
@@ -239,55 +221,51 @@ To address this, 4 most recent frames are concatenated together to form the stat
 
 To speed up the training process, the following optimization is done:
 \begin{enumerate}
-    \item Early termination - It is observed that the agent often gets stuck at a particular state and unable to advance to the right. Hence a custom wrapper is written for the environment so that the episode is terminated quickly in that situation.
+    \item Early termination - It is observed that the agent often gets stuck at a particular state and unable to advance to the right. Hence a custom wrapper is written for the environment to terminate quickly when stuck.
     \item Parallelization - Multiple instances of the environment are run in parallel. Each environment is initialized with a different random seed. Agent is deployed on each instance and the experience is collected in parallel. Then policy/value update is done in a batch on the collected experience. This allows efficient use of the multi-core CPU and GPU resources. This improves the training speed from ~100it/s to ~500it/s.
 \end{enumerate}
 
 \subsection{Reward Shaping}
 
-In the environment the reward is clipped to [-15, 15], then in the baseline implementation of the task, it is further clipped to [-1, 1]. \cite{vanhasseltLearningValuesMany2016} suggest that the learning algorithms are not reward scale invariant. Clipping makes the reward signal sparse and the agent has to explore a lot to find the optimal policy. Hence appropriate scale of the reward is important. The reward is intercepted and scaled to [-1, 1] before being passed to the agent.
+In the mario environment the reward is clipped to [-15, 15], then in the baseline implementation of the task, it is further clipped to [-1, 1]. \cite{vanhasseltLearningValuesMany2016} suggest that the learning algorithms are not reward scale invariant. Clipping makes the reward signal sparse and the agent has to explore a lot to find the optimal policy. Hence appropriate scale of the reward is important. In our implementation, the reward is intercepted and scaled to [-1, 1] before being passed to the agent.
 
 \section{Reinforcement Learning Results}
-
-\subsection{Compare Algorithms}
 
 The 3 algorithms are trained on the Mario game environment. The average reward per episode is plotted in Fig.~\ref{fig:compare_algorithms}. It can be seen that PPO outperforms the other 2 algorithms.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{compare_alg.png}
-    \caption{Average reward per episode for different reinforcement learning algorithms. Trains for 500000 steps. 3 runs are done per algorithm (faded color) and the average training curve is plotted (solid color). Reward plotted is a running average of 100 episodes.}
+    \includegraphics[width=0.34\textwidth]{compare_alg.png}
+    \caption{Running average reward per episode for different reinforcement learning algorithms. Trains for 500,000 steps. 3 runs per algorithm (faded color) and the average training curve is plotted (solid color).}
     \label{fig:compare_algorithms}
 \end{figure}
 
-\subsection{Hyper-Parameter Tuning}
-
-Different gamma value and learning rates are tested. The average reward per episode is plotted Fig.~\ref{fig:compare_gamma} and Fig.~\ref{fig:compare_learning_rate}.
-
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{compare_gamma.png}
+    \includegraphics[width=0.34\textwidth]{compare_gamma.png}
     \caption{Average reward per episode for different gamma values. Learning rate is fixed at 0.0001 and algorithm used is PPO.}
     \label{fig:compare_gamma}
 \end{figure}
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.49\textwidth]{compare_learning_rate.png}
+    \includegraphics[width=0.34\textwidth]{compare_learning_rate.png}
     \caption{Average reward per episode for different learning rate values. Learning rate is fixed at 0.0001 and algorithm used is PPO.}
     \label{fig:compare_learning_rate}
 \end{figure}
 
-The best performing hyper-parameters are selected for the final training:
-\(learning_rate = 0.0001, gamma=0.9\).
+Different gamma value and learning rates are tested. The average reward per episode is plotted Fig.~\ref{fig:compare_gamma} and Fig.~\ref{fig:compare_learning_rate}. The best performing hyper-parameters are selected for the final training: \(learning_rate = 0.0001, gamma=0.9\). Using these parameters and PPO, the agent is trained for 5 million steps. It took over 6 hours. The running average rewards per episode is plotted in Fig.~\ref{fig:final_training}. It can be seen that the agent encountered a difficult barrier at around 200 points of reward and it took around 1 million trial steps to overcome it. The agent is able to consistently complete level 1 of the game. The final average reward per episode is 423.
 
-\subsection{Large number of steps}
-
-Use the best performing hyper-parameters and PPO algorithm, the agent is trained for 5 million steps. The running average rewards per episode is plotted in Fig.~\ref{fig:final_training}.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.34\textwidth]{final_training.png}
+    \caption{Average reward per episode for 5 million steps training}
+    \label{fig:final_training}
+\end{figure}
 
 \section{Conclusion}
 
-In this coursework, we explored two different machine learning tasks: image text matching and deep reinforcement learning. For image text matching, we experimented with different image and text encoders and classifiers. The best performing model combined a pre-trained CNN image encoder with attention based classifier achieving an accuracy of 83.37\% on the test set. For deep reinforcement learning, we tested 3 different algorithms on the Mario game environment. The best performing algorithm is PPO, which achieved an average reward of 1000 per episode after 5 million steps.
+In this coursework, we explored two different machine learning tasks: image text matching and deep reinforcement learning. For image text matching, we experimented with different image and text encoders and classifiers. The best performing model combined a pre-trained CNN image encoder with attention based classifier achieving an accuracy of 83.37\% on the test set. For deep reinforcement learning, we tested 3 different algorithms on the Mario game environment. The best performing algorithm is PPO, which achieved an average reward of 423 per episode after 5 million steps and is able to complete level 1 consistently.
 
 \bibliographystyle{IEEEtran}
 \bibliography{IEEEabrv,AML.bib}

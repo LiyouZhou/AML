@@ -62,9 +62,9 @@ class CustomRewardAndDoneEnv(gym.Wrapper):
             reward += 500
             done = True
             print("GOAL")
-        # if info["life"] < 2:
-        #     reward -= 500
-        #     done = True
+        if info["life"] < 2:
+            # reward -= 500
+            done = True
 
         self.current_score = info["score"]
         self.max_x = max(self.max_x, self.current_x)
@@ -75,7 +75,7 @@ class CustomRewardAndDoneEnv(gym.Wrapper):
             done = True
             # print("STUCK")
 
-        return state, reward, done, info
+        return state, reward/15, done, info
 
 
 class MarioNet(BaseFeaturesExtractor):
@@ -190,9 +190,10 @@ def make_single_env(gym_id, seed, i=0, log_dir=None):
     env = gym_super_mario_bros.make(gym_id)
     RIGHT_JUMP_ONLY = [
         ["NOOP"],
-        ["A"],
         ["right"],
         ["right", "A"],
+        ["right", "B"],
+        ["right", "A", "B"],
     ]
     env = JoypadSpace(env, RIGHT_JUMP_ONLY)
     env = CustomRewardAndDoneEnv(env)
@@ -207,13 +208,14 @@ def make_single_env(gym_id, seed, i=0, log_dir=None):
     return env
 
 
-def make_env(gym_id, seed, log_dir=None, n_envs=16):
+def make_env(gym_id, seed, log_dir=None, n_envs=8):
     # env = DummyVecEnv([lambda: make_single_env(gym_id, seed, i, log_dir) for i in range(1)])
     env = make_vec_env(
         lambda: make_single_env(gym_id, seed, log_dir=log_dir),
         n_envs=n_envs,
         vec_env_cls=SubprocVecEnv,
         monitor_dir=Path(log_dir) / "monitor" if log_dir else None,
+        monitor_kwargs={"info_keywords": ("score", "x_pos", "y_pos", "life", "flag_get", "time")},
     )
     env = VecFrameStack(env, 4, channels_order="last")
 
@@ -253,13 +255,9 @@ def build_model(
             learning_rate=learning_rate,
             gamma=gamma,
             verbose=1,
+            tensorboard_log=log_dir,
         )
     elif learningAlg == "PPO":
-        GAE = 1.0
-        ENT_COEF = 0.01
-        N_STEPS = 512
-        BATCH_SIZE = 64
-        N_EPOCHS = 10
         model = PPO(
             "CnnPolicy",
             environment,
@@ -269,11 +267,6 @@ def build_model(
             verbose=1,
             # policy_kwargs=policy_kwargs,
             tensorboard_log=log_dir,
-            n_steps=N_STEPS,
-            batch_size=BATCH_SIZE,
-            n_epochs=N_EPOCHS,
-            gae_lambda=GAE,
-            ent_coef=ENT_COEF,
         )
     else:
         print("UNKNOWN learningAlg=" + str(learningAlg))
@@ -384,15 +377,18 @@ def train(
     if trainMode:
         model.learn(
             total_timesteps=num_training_steps,
-            log_interval=num_training_steps / 30,
-            tb_log_name=log_folder,
+            tb_log_name="run",
             progress_bar=True,
             callback=callback,
         )
         print("Saving policy " + str(log_folder / policyFileName))
         pickle.dump(model.policy, open(log_folder / policyFileName, "wb"))
         model.save(str(log_folder / "final_model.zip"))
-        eval(log_folder=log_folder, num_test_episodes=num_test_episodes, policy_rendering=policy_rendering)
+        eval(
+            log_folder=log_folder,
+            num_test_episodes=num_test_episodes,
+            policy_rendering=policy_rendering,
+        )
 
 
 def eval(log_folder, num_test_episodes=10, policy_rendering=True):
